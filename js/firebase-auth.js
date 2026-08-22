@@ -187,16 +187,6 @@ window.checkDashboardAuth = function () {
     onAuthStateChanged(firebaseAuth, function (user) {
     const currentPath = window.location.pathname;
 
-    if (user && currentPath.includes('dashboard.html')) {
-      const navEntries = performance.getEntriesByType('navigation');
-      if (navEntries.length > 0 && navEntries[0].type === 'reload') {
-        signOut(firebaseAuth).then(() => {
-          window.location.href = 'admin.html';
-        });
-        return;
-      }
-    }
-
     if (!user && currentPath.includes('dashboard.html')) {
       window.location.href = 'admin.html';
       return;
