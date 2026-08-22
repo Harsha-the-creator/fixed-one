@@ -25,6 +25,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // File state
   let uploadedFileDetails = null;
 
+  function readImageForStorage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = event => {
+        const image = new Image();
+        image.onload = () => {
+          const maxDimension = 900;
+          const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        image.onerror = reject;
+        image.src = event.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   // Initialize progress bar
   updateProgress();
 
@@ -264,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Process selected file
-  function handleFileUpload(file) {
+  async function handleFileUpload(file) {
     const uploadError = document.getElementById('uploadErrorMsg');
     
     // File validation rules (PDF, PNG, JPG, JPEG)
@@ -287,7 +309,8 @@ document.addEventListener('DOMContentLoaded', () => {
     uploadedFileDetails = {
       name: file.name,
       type: file.type || 'application/octet-stream',
-      size: file.size
+      size: file.size,
+      data: file.type.startsWith('image/') ? await readImageForStorage(file) : ''
     };
 
     // Update preview card details
@@ -333,7 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
         prevSchool: document.getElementById('prevSchool').value.trim(),
         docName: uploadedFileDetails.name,
         docType: uploadedFileDetails.type,
-        docSize: uploadedFileDetails.size
+        docSize: uploadedFileDetails.size,
+        photo: uploadedFileDetails.data
       };
 
       try {
