@@ -4,9 +4,9 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   // Verify admin session login state first
-  if (typeof window.Auth !== 'undefined') {
-    window.Auth.checkAuthAndRedirect();
-  }
+  const authCheck = typeof window.Auth !== 'undefined'
+    ? window.Auth.checkAuthAndRedirect()
+    : Promise.resolve(null);
 
   // DOM Elements
   const tableBody = document.getElementById('applicationsTableBody');
@@ -71,8 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnStudentModalClose = document.getElementById('btnStudentModalClose');
   const btnStudentModalCloseFooter = document.getElementById('btnStudentModalCloseFooter');
   
-  // Init page data loads
-  loadDashboardData();
+  // Init page data loads after Firebase restores the admin session.
+  authCheck.then(user => {
+    if (user) loadDashboardData();
+  });
   initStudentRecords();
 
   // Tab Toggling Action Bindings
@@ -792,8 +794,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Open Details Modal and populate values
-  function openDetailsModal(id) {
-    const app = window.DB.getApplicationById(id);
+  async function openDetailsModal(id) {
+    let app;
+    try {
+      app = await window.DB.getApplicationById(id);
+    } catch (error) {
+      console.error('Unable to load application details:', error);
+      showToast('Load Failed', 'The application details could not be loaded.', 'error');
+      return;
+    }
     if (!app) return;
 
     // Set Text Contents
