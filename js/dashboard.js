@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearStudentsBtn = document.getElementById('clearStudentsBtn');
   const studentTableBody = document.getElementById('studentTableBody');
   let studentRecords = [];
+  let applications = [];
   
   // Stats Elements
   const statTotal = document.getElementById('statTotal');
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Filters change bindings
   [searchInput, classFilter, statusFilter].forEach(el => {
     el.addEventListener('input', () => {
-      renderApplicationsTable();
+      renderApplicationsTable(applications);
     });
   });
 
@@ -175,18 +176,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Loader master coordinator function
-  function loadDashboardData() {
-    renderApplicationsTable();
-    calculateStatsMetrics();
+  async function loadDashboardData() {
+    try {
+      applications = await window.DB.getApplications();
+      renderApplicationsTable(applications);
+      calculateStatsMetrics(applications);
+    } catch (error) {
+      console.error('Unable to load applications:', error);
+      applications = [];
+      renderApplicationsTable([]);
+      calculateStatsMetrics([]);
+    }
     renderToppersTable();
   }
 
   // Render Datatable applications list rows
-  function renderApplicationsTable() {
+  function renderApplicationsTable(applications) {
     tableBody.innerHTML = '';
-    
-    // Fetch latest rows from DB layer
-    const appsList = window.DB.getApplications();
+    const appsList = applications || [];
     const query = searchInput.value.toLowerCase().trim();
     const selectedClass = classFilter.value;
     const selectedStatus = statusFilter.value;
@@ -283,27 +290,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Handle updates in statuses
-  function processStatusChange(id, status) {
-    const updated = window.DB.updateApplicationStatus(id, status);
-    
-    if (updated) {
-      loadDashboardData();
+  async function processStatusChange(id, status) {
+    try {
+      const updated = await window.DB.updateApplicationStatus(id, status);
+
+      if (updated) {
+        await loadDashboardData();
       
-      const type = status === 'approved' ? 'success' : 'error';
-      showToast(
-        'Application Updated', 
-        `Status of ${id} set to ${status.toUpperCase()}. Simulated email sent.`, 
-        type
-      );
+        const type = status === 'approved' ? 'success' : 'error';
+        showToast(
+          'Application Updated',
+          `Status of ${id} set to ${status.toUpperCase()}. Simulated email sent.`,
+          type
+        );
+      }
+    } catch (error) {
+      console.error('Unable to update application status:', error);
+      showToast('Update Failed', 'The application status could not be updated.', 'error');
     }
   }
 
   // Clear all application records
-  function clearAllApplications() {
-    window.DB.clearApplications();
-    loadDashboardData();
-    renderApplicationsTable();
-    showToast('Application Database Cleared', 'All application records have been removed.', 'success');
+  async function clearAllApplications() {
+    try {
+      await window.DB.clearApplications();
+      await loadDashboardData();
+      showToast('Application Database Cleared', 'All application records have been removed.', 'success');
+    } catch (error) {
+      console.error('Unable to clear applications:', error);
+      showToast('Clear Failed', 'The application records could not be cleared.', 'error');
+    }
   }
 
   function compressImage(file, maxWidth = 400, maxHeight = 400, quality = 0.7) {
@@ -823,8 +839,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Calculate top totals metrics panels counts
-  function calculateStatsMetrics() {
-    const list = window.DB.getApplications();
+  function calculateStatsMetrics(list) {
     
     const total = list.length;
     const pending = list.filter(a => a.status === 'pending').length;
