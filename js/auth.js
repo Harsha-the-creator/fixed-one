@@ -12,7 +12,7 @@ function logoutAdminWrapper() {
 
 function checkAuthAndRedirect() {
   if (typeof window.checkDashboardAuth === 'function') {
-    window.checkDashboardAuth();
+    return window.checkDashboardAuth();
   } else if (window.location.pathname.includes('dashboard.html')) {
     window.location.href = 'admin.html';
   }
