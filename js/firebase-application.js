@@ -4,8 +4,6 @@ import {
   collection,
   doc,
   setDoc,
-  onSnapshot,
-  deleteDoc,
   updateDoc,
   query,
   orderBy,
@@ -16,7 +14,6 @@ import {
 import { loadFirebaseConfig } from './firebase-config.js';
 
 const APPLICATIONS_COLLECTION = 'applications';
-const FALLBACK_KEY = 'admissions_applications';
 
 let db = null;
 
@@ -25,24 +22,8 @@ try {
   const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   db = getFirestore(app);
 } catch (error) {
-  console.warn('Firebase Firestore initialization failed for applications, using fallback storage:', error);
+  console.error('Firebase application storage setup failed:', error);
   db = null;
-}
-
-function readFallbackApplications() {
-  try {
-    return JSON.parse(window.localStorage.getItem(FALLBACK_KEY) || '[]');
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeFallbackApplications(apps) {
-  try {
-    window.localStorage.setItem(FALLBACK_KEY, JSON.stringify(apps));
-  } catch (error) {
-    console.warn('Unable to persist fallback applications:', error);
-  }
 }
 
 function normalizeApplication(app = {}, id = '') {
@@ -69,13 +50,7 @@ function normalizeApplication(app = {}, id = '') {
 async function addApplication(appData) {
   const payload = normalizeApplication({ ...appData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 
-  if (!db) {
-    payload.id = 'local-' + Date.now();
-    const fallback = readFallbackApplications();
-    fallback.unshift(payload);
-    writeFallbackApplications(fallback);
-    return payload;
-  }
+  if (!db) throw new Error('Firestore is not available');
 
   try {
     const appsRef = collection(db, APPLICATIONS_COLLECTION);
@@ -84,18 +59,13 @@ async function addApplication(appData) {
     await setDoc(docRef, payload);
     return payload;
   } catch (error) {
-    console.error('Firestore addApplication failed. Falling back to local storage. Error:', error);
-    payload.id = 'local-' + Date.now();
-    const fallback = readFallbackApplications();
-    fallback.unshift(payload);
-    writeFallbackApplications(fallback);
-    return payload;
+    console.error('Firestore addApplication failed:', error);
+    throw error;
   }
 }
 
 async function getApplications() {
-  const fallback = readFallbackApplications();
-  if (!db) return fallback;
+  if (!db) throw new Error('Firestore is not available');
 
   try {
     const appsRef = collection(db, APPLICATIONS_COLLECTION);
@@ -106,25 +76,16 @@ async function getApplications() {
       firestoreApps.push(normalizeApplication(docSnap.data(), docSnap.id));
     });
 
-    // keep local-only entries (ids starting with local-)
-    const localOnly = fallback.filter(a => String(a.id).startsWith('local-'));
-    const combined = [...localOnly, ...firestoreApps];
-    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    writeFallbackApplications(combined);
-    return combined;
+    return firestoreApps;
   } catch (error) {
-    console.warn('Unable to load applications from Firestore, using local fallback:', error);
-    return fallback;
+    console.error('Unable to load applications from Firestore:', error);
+    throw error;
   }
 }
 
 async function getApplicationById(id) {
   if (!id) return null;
-  const fallback = readFallbackApplications();
-  const foundLocal = fallback.find(a => String(a.id).toUpperCase() === String(id).trim().toUpperCase());
-  if (foundLocal) return foundLocal;
-
-  if (!db) return null;
+  if (!db) throw new Error('Firestore is not available');
 
   try {
     const docRef = doc(db, APPLICATIONS_COLLECTION, id);
@@ -133,38 +94,29 @@ async function getApplicationById(id) {
     const data = normalizeApplication(snap.data(), snap.id);
     return data;
   } catch (error) {
-    console.warn('Firestore getApplicationById failed:', error);
-    return null;
+    console.error('Firestore getApplicationById failed:', error);
+    throw error;
   }
 }
 
 async function updateApplicationStatus(id, newStatus) {
   if (!id) return null;
 
-  // Update local fallback first
-  const fallback = readFallbackApplications().map(a => {
-    if (a.id === id) {
-      return { ...a, status: newStatus, updatedAt: new Date().toISOString() };
-    }
-    return a;
-  });
-  writeFallbackApplications(fallback);
-
-  if (!db) return fallback.find(a => a.id === id) || null;
+  if (!db) throw new Error('Firestore is not available');
 
   try {
     const docRef = doc(db, APPLICATIONS_COLLECTION, id);
-    await updateDoc(docRef, { status: newStatus, updatedAt: new Date().toISOString() });
-    return fallback.find(a => a.id === id) || null;
+    const updatedAt = new Date().toISOString();
+    await updateDoc(docRef, { status: newStatus, updatedAt });
+    return getApplicationById(id);
   } catch (error) {
-    console.warn('Firestore updateApplicationStatus failed:', error);
-    return fallback.find(a => a.id === id) || null;
+    console.error('Firestore updateApplicationStatus failed:', error);
+    throw error;
   }
 }
 
 async function clearApplications() {
-  writeFallbackApplications([]);
-  if (!db) return [];
+  if (!db) throw new Error('Firestore is not available');
 
   try {
     const appsRef = collection(db, APPLICATIONS_COLLECTION);
@@ -174,12 +126,12 @@ async function clearApplications() {
     await batch.commit();
     return [];
   } catch (error) {
-    console.warn('Firestore clearApplications failed:', error);
-    return [];
+    console.error('Firestore clearApplications failed:', error);
+    throw error;
   }
 }
 
-// Expose ApplicationDB and patch global DB if present
+// APPLICATIONS: Expose Firestore methods to existing page code.
 window.ApplicationDB = {
   addApplication,
   getApplications,
@@ -209,5 +161,4 @@ function patchGlobalDB() {
   }
 }
 
-// Attempt patching after a short delay so that pages which load DB first get patched
-setTimeout(patchGlobalDB, 150);
+patchGlobalDB();
