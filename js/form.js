@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
       pageLoader.querySelector('.page-loader-text').textContent = 'SUBMITTING FORM...';
     }
 
-    setTimeout(async () => {
+    (async () => {
       // Gather form values
       const formData = {
         studentName: document.getElementById('studentName').value.trim(),
@@ -336,38 +336,45 @@ document.addEventListener('DOMContentLoaded', () => {
         docSize: uploadedFileDetails.size
       };
 
-      // Call database layer and await send status
-      const submittedApp = await window.DB.createApplication(formData);
+      try {
+        // Call database layer and await the Firestore write.
+        const submittedApp = await window.DB.createApplication(formData);
 
-      // Hide Loader
-      if (pageLoader) {
-        pageLoader.classList.add('fade-out');
-        setTimeout(() => {
-          pageLoader.style.display = 'none';
-        }, 400);
-      }
+        // Hide Loader
+        if (pageLoader) {
+          pageLoader.classList.add('fade-out');
+          setTimeout(() => {
+            pageLoader.style.display = 'none';
+          }, 400);
+        }
 
-      // Hide wizard elements & show success screen
-      document.getElementById('formWizardCard').style.display = 'none';
-      document.getElementById('wizardProgressHeader').style.display = 'none';
-      
-      const successScreen = document.getElementById('successScreen');
-      document.getElementById('successAppId').textContent = submittedApp.id;
-      document.getElementById('btnSuccessTrack').href = `status.html?id=${submittedApp.id}`;
+        // Hide wizard elements & show success screen
+        document.getElementById('formWizardCard').style.display = 'none';
+        document.getElementById('wizardProgressHeader').style.display = 'none';
 
-      successScreen.style.display = 'block';
-      successScreen.scrollIntoView({ behavior: 'smooth' });
+        const successScreen = document.getElementById('successScreen');
+        document.getElementById('successAppId').textContent = submittedApp.id;
+        document.getElementById('btnSuccessTrack').href = `status.html?id=${submittedApp.id}`;
 
-      if (submittedApp) {
+        successScreen.style.display = 'block';
+        successScreen.scrollIntoView({ behavior: 'smooth' });
+
         showToast(
           'Application Submitted',
           `Your application has been received successfully. Application ID: ${submittedApp.id}`,
           'success'
         );
+      } catch (error) {
+        console.error('Application submission failed:', error);
+        if (pageLoader) {
+          pageLoader.classList.add('fade-out');
+          setTimeout(() => {
+            pageLoader.style.display = 'none';
+          }, 400);
+        }
+        showToast('Submission Failed', 'Unable to save your application. Please try again.', 'error');
       }
-
-
-    }, 1500); // Simulated delay to showcase professional spinner
+    })();
   }
 
   // Toast UI Generator
