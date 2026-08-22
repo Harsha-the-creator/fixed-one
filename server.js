@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -81,6 +82,40 @@ app.get('/api/firebase-config', (req, res) => {
   }
 
   res.json(config);
+});
+
+app.post('/api/send-status-email', async (req, res) => {
+  const { email, studentName, applicationId, status } = req.body || {};
+  const allowedStatuses = ['approved', 'rejected', 'pending'];
+
+  if (!email || !studentName || !applicationId || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Incomplete status email details' });
+  }
+
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return res.status(503).json({ error: 'Email service is not configured' });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE).toLowerCase() === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  });
+  const statusText = status === 'approved' ? 'approved' : status === 'rejected' ? 'not approved' : 'returned to pending review';
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: `Application ${applicationId} status update`,
+      text: `Dear Parent/Guardian,\n\nThe application for ${studentName} (ID: ${applicationId}) has been ${statusText}.\n\nPlease contact the admissions office for further details.\n\nGAYATRI JUNIOR & DEGREE COLLEGE`
+    });
+    res.json({ sent: true });
+  } catch (error) {
+    console.error('Status email failed:', error);
+    res.status(502).json({ error: 'Unable to send status email' });
+  }
 });
 
 // Catch-all route to serve index.html for SPA-like navigation
