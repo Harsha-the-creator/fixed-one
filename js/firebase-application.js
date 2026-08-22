@@ -41,6 +41,7 @@ function normalizeApplication(app = {}, id = '') {
     docName: app.docName || app.documentName || 'not_uploaded.pdf',
     docType: app.docType || 'application/pdf',
     docSize: Number(app.docSize || 0),
+    photo: app.photo || app.docData || app.documentData || app.imageData || '',
     status: app.status || 'pending',
     createdAt: app.createdAt || new Date().toISOString(),
     updatedAt: app.updatedAt || new Date().toISOString()
