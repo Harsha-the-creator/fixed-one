@@ -869,12 +869,14 @@
 
   <!-- Core Scripts -->
   <script type="module" src="js/firebase-toppers.js"></script>
+  <!-- CONTACT MESSAGES: Load standalone Firestore persistence for the public contact form. -->
+  <script type="module" src="js/contact-messages.js"></script>
   <script src="js/db.js"></script>
   <script src="js/app.js"></script>
 
   <script>
-    // Handle contact form submission
-    function handleContactFormSubmit() {
+    // CONTACT MESSAGES: Save public enquiries in Firestore.
+    async function handleContactFormSubmit() {
       const form = document.getElementById('contactForm');
       const name = document.getElementById('cName').value.trim();
       const email = document.getElementById('cEmail').value.trim();
@@ -882,28 +884,16 @@
       const message = document.getElementById('cMsg').value.trim();
 
       if (name && email && subject && message) {
-        // Save message to database
-        const newMessage = window.DB.createContactMessage({
-          name: name,
-          email: email,
-          subject: subject,
-          message: message
-        });
-
-        // Show success message
-        alert('Thank you for reaching out! Your message has been saved and our admissions office will review it shortly.');
-        
-        // Reset form
-        form.reset();
+        try {
+          await window.DB.createContactMessage({ name, email, subject, message });
+          alert('Thank you for reaching out! Your message has been saved and our admissions office will review it shortly.');
+          form.reset();
+        } catch (error) {
+          console.error('Unable to save contact message:', error);
+          alert('Unable to save your message right now. Please try again.');
+        }
       }
     }
-
-    // Initialize DB when page loads
-    document.addEventListener('DOMContentLoaded', () => {
-      if (typeof window.DB !== 'undefined') {
-        window.DB.getContactMessages(); // Initialize messages storage
-      }
-    });
   </script>
 </body>
 
