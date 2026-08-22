@@ -298,12 +298,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (updated) {
         await loadDashboardData();
-      
-        const type = status === 'approved' ? 'success' : 'error';
+        const application = applications.find(item => item.id === id);
+        let emailSent = false;
+        if (application?.email) {
+          try {
+            const emailEndpoint = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+              ? '/api/send-status-email'
+              : '/.netlify/functions/send-status-email';
+            const emailResponse = await fetch(emailEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: application.email,
+                studentName: application.studentName,
+                applicationId: id,
+                status
+              })
+            });
+            emailSent = emailResponse.ok;
+          } catch (emailError) {
+            console.error('Unable to send status email:', emailError);
+          }
+        }
+
         showToast(
           'Application Updated',
-          `Status of ${id} set to ${status.toUpperCase()}. Simulated email sent.`,
-          type
+          `Status of ${id} set to ${status.toUpperCase()}. ${emailSent ? 'Email sent successfully.' : 'Email was not sent.'}`,
+          emailSent ? 'success' : 'info'
         );
       }
     } catch (error) {
@@ -820,13 +841,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // File upload data details
     const mDocName = document.getElementById('mDocName');
     const mDocMeta = document.getElementById('mDocMeta');
+    const mDocPreview = document.getElementById('mDocPreview');
     
     mDocName.textContent = app.docName;
     mDocMeta.textContent = `${app.docType.split('/')[1].toUpperCase()} • ${formatBytes(app.docSize)}`;
+    if (mDocPreview) {
+      mDocPreview.src = app.photo || '';
+      mDocPreview.style.display = app.photo ? 'block' : 'none';
+    }
     
     // Bind modal viewer action
     btnModalViewDoc.onclick = () => {
-      alert(`[SIMULATION] Viewing File Document: ${app.docName}\nType: ${app.docType}\nSize: ${formatBytes(app.docSize)}`);
+      if (app.photo) {
+        window.open(app.photo, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      alert(`This application was saved before image preview was enabled. Please ask the applicant to submit the form again to store the image preview.`);
     };
 
     // Bind status tracking redirection
