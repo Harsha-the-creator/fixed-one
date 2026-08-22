@@ -141,11 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Clear all contact messages button
   if (clearMessagesBtn) {
-    clearMessagesBtn.addEventListener('click', () => {
+    clearMessagesBtn.addEventListener('click', async () => {
       if (confirm('Are you sure you want to delete all contact messages permanently?')) {
-        localStorage.setItem('contact_messages', JSON.stringify([]));
-        showToast('Messages Cleared', 'All contact messages have been deleted.', 'success');
-        renderMessagesTable();
+        try {
+          await window.DB.clearContactMessages();
+          showToast('Messages Cleared', 'All contact messages have been deleted.', 'success');
+          await renderMessagesTable();
+        } catch (error) {
+          console.error('Unable to clear contact messages:', error);
+          showToast('Error', 'Unable to clear contact messages.', 'error');
+        }
       }
     });
   }
@@ -833,9 +838,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Render Contact Messages table
-  function renderMessagesTable() {
+  async function renderMessagesTable() {
     messagesTableBody.innerHTML = '';
-    const messages = window.DB.getContactMessages();
+    let messages;
+    try {
+      messages = await window.DB.getContactMessages();
+    } catch (error) {
+      console.error('Unable to load contact messages:', error);
+      messagesEmptyState.style.display = 'block';
+      return;
+    }
     
     messagesCount.textContent = messages.length;
 
@@ -891,15 +903,15 @@ document.addEventListener('DOMContentLoaded', () => {
   function bindMessageActions() {
     // View message click handlers
     document.querySelectorAll('.btn-view-message').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const msgId = btn.getAttribute('data-id');
-        const messages = window.DB.getContactMessages();
+        const messages = await window.DB.getContactMessages();
         const message = messages.find(m => m.id === msgId);
         
         if (message) {
           alert(`From: ${message.name} (${message.email})\nSubject: ${message.subject}\nDate: ${formatDate(message.createdAt)}\n\nMessage:\n${message.message}`);
-          window.DB.markMessageAsRead(msgId);
-          renderMessagesTable();
+          await window.DB.markMessageAsRead(msgId);
+          await renderMessagesTable();
         }
       });
     });
@@ -916,13 +928,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Delete a message
-  function deleteMessage(msgId) {
-    let messages = JSON.parse(localStorage.getItem('contact_messages')) || [];
-    messages = messages.filter(m => m.id !== msgId);
-    localStorage.setItem('contact_messages', JSON.stringify(messages));
-    
-    showToast('Message Deleted', 'The message has been removed.', 'success');
-    renderMessagesTable();
+  async function deleteMessage(msgId) {
+    try {
+      await window.DB.deleteContactMessage(msgId);
+      showToast('Message Deleted', 'The message has been removed.', 'success');
+      await renderMessagesTable();
+    } catch (error) {
+      console.error('Unable to delete contact message:', error);
+      showToast('Error', 'Unable to delete contact message.', 'error');
+    }
   }
 
   // Size helper formatter
