@@ -108,7 +108,7 @@ async function updateApplicationStatus(id, newStatus) {
     const docRef = doc(db, APPLICATIONS_COLLECTION, id);
     const updatedAt = new Date().toISOString();
     await updateDoc(docRef, { status: newStatus, updatedAt });
-    return getApplicationById(id);
+    return { id, status: newStatus, updatedAt };
   } catch (error) {
     console.error('Firestore updateApplicationStatus failed:', error);
     throw error;
