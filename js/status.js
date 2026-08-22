@@ -63,12 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Search execution logic
-  function performSearch(appId) {
+  async function performSearch(appId) {
     errorMsg.style.display = 'none';
     resultCard.style.display = 'none';
 
-    // Query database layer
-    const application = window.DB.getApplicationById(appId);
+    let application;
+    try {
+      application = await window.DB.getApplicationById(appId);
+    } catch (error) {
+      console.error('Unable to load application status:', error);
+      errorMsg.textContent = 'Unable to load this application right now. Please try again.';
+      errorMsg.style.display = 'block';
+      return;
+    }
 
     if (!application) {
       errorMsg.textContent = `No application record found matching ID "${appId}". Please check the ID and try again.`;
