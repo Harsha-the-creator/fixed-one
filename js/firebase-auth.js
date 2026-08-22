@@ -178,23 +178,29 @@ window.logoutAdmin = async function () {
 };
 
 window.checkDashboardAuth = function () {
-  authReady.then(firebaseAuth => {
+  return authReady.then(firebaseAuth => {
     if (!firebaseAuth) {
       window.location.href = 'admin.html';
-      return;
+      return null;
     }
 
-    onAuthStateChanged(firebaseAuth, function (user) {
-    const currentPath = window.location.pathname;
+    return new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, function (user) {
+        unsubscribe();
+        const currentPath = window.location.pathname;
 
-    if (!user && currentPath.includes('dashboard.html')) {
-      window.location.href = 'admin.html';
-      return;
-    }
+        if (!user && currentPath.includes('dashboard.html')) {
+          window.location.href = 'admin.html';
+          resolve(null);
+          return;
+        }
 
-    if (user && currentPath.includes('admin.html')) {
-      window.location.href = 'dashboard.html';
-    }
+        if (user && currentPath.includes('admin.html')) {
+          window.location.href = 'dashboard.html';
+        }
+
+        resolve(user);
+      });
     });
   });
 };
